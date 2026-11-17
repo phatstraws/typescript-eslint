@@ -355,14 +355,23 @@ export default createRule<Options, MessageIds>({
       ): IterableIterator<TSESLint.RuleFix> {
         if (isLogicalOrOperator(node.parent)) {
           // '&&' and '??' operations cannot be mixed without parentheses (e.g. a && b ?? c)
-          if (
-            node.left.type === AST_NODE_TYPES.LogicalExpression &&
-            !isLogicalOrOperator(node.left.left)
-          ) {
-            yield fixer.insertTextBefore(node.left.right, '(');
-          } else {
-            yield fixer.insertTextBefore(node.left, '(');
-          }
+          yield fixer.insertTextBefore(
+            isUnparenthesizedLogicalExpression(node.left, context.sourceCode)
+              ? node.left.right
+              : node.left,
+            '(',
+          );
+          yield fixer.insertTextAfter(node.right, ')');
+        } else if (
+          isUnparenthesizedLogicalExpression(node.left, context.sourceCode)
+        ) {
+          yield fixer.insertTextBefore(node.left, '(');
+          yield fixer.insertTextAfter(node.left, ')');
+        }
+        if (
+          isUnparenthesizedLogicalExpression(node.right, context.sourceCode)
+        ) {
+          yield fixer.insertTextBefore(node.right, '(');
           yield fixer.insertTextAfter(node.right, ')');
         }
         yield fixer.replaceText(
@@ -727,6 +736,16 @@ function isBuiltInBooleanCall(
     return variable == null || variable.defs.length === 0;
   }
   return false;
+}
+
+function isUnparenthesizedLogicalExpression(
+  node: TSESTree.Node,
+  sourceCode: Readonly<TSESLint.SourceCode>,
+): node is TSESTree.LogicalExpression {
+  return (
+    node.type === AST_NODE_TYPES.LogicalExpression &&
+    !isParenthesized(node, sourceCode)
+  );
 }
 
 function isMixedLogicalExpression(
